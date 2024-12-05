@@ -1,0 +1,191 @@
+!pip install requests
+!pip install beautifulsoup4
+import requests
+from bs4 import BeautifulSoup
+import os
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from tqdm import tqdm
+import gensim
+import itertools
+import numpy as np
+import json
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import xml.etree.ElementTree as ET
+import json
+import os
+
+# Download all of pubmed (it tends to crash from time to time, so see script in next cell)
+import os
+import requests
+import gzip
+from tqdm import tqdm
+
+
+base_url = "https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/"
+save_path = "/content/drive/MyDrive/Colab Notebooks/Whole PubMed"
+
+def download_and_decompress(filename, save_path):
+    file_url = base_url + filename
+    response = requests.get(file_url, stream=True)
+    response.raise_for_status()
+
+    decompressed_filename = filename[:-3]  # Remove ".gz"
+    with open(os.path.join(save_path, filename), 'wb') as compressed_file:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                compressed_file.write(chunk)
+
+    with gzip.open(os.path.join(save_path, filename), 'rb') as compressed_file:
+        with open(os.path.join(save_path, decompressed_filename), 'wb') as decompressed_file:
+            decompressed_file.write(compressed_file.read())
+
+# Create the directory
+os.makedirs(save_path, exist_ok=True)
+
+# Download and decompress with progress bar
+for i in tqdm(range(1, 1220)):
+    filename = f"pubmed24n{i:04d}.xml.gz"
+    download_and_decompress(filename, save_path)
+# In case it crashes, restart from last saved file
+import os
+import requests
+import gzip
+from tqdm import tqdm
+
+base_url = "https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/"
+save_path = "/content/drive/MyDrive/Colab Notebooks/Whole PubMed"
+
+def download_and_decompress(filename, save_path):
+    file_url = base_url + filename
+    response = requests.get(file_url, stream=True)
+    response.raise_for_status()
+
+    decompressed_filename = filename[:-3]
+    with open(os.path.join(save_path, filename), 'wb') as compressed_file:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                compressed_file.write(chunk)
+
+    with gzip.open(os.path.join(save_path, filename), 'rb') as compressed_file:
+        with open(os.path.join(save_path, decompressed_filename), 'wb') as decompressed_file:
+            decompressed_file.write(compressed_file.read())
+
+# Create the directory
+os.makedirs(save_path, exist_ok=True)
+
+# Resume Download
+start_file = 1076  # Update this to resume from a different file
+for i in tqdm(range(start_file, 1220)):
+    filename = f"pubmed24n{i:04d}.xml.gz"
+    filepath = os.path.join(save_path, filename)
+
+    if not os.path.exists(filepath):
+        download_and_decompress(filename, save_path)
+# Check if all files are present
+import os
+
+save_path = "/content/drive/MyDrive/Colab Notebooks/Whole PubMed"  # Update with your path
+
+def check_compressed_files(save_path):
+    missing_files = []
+    for i in range(1, 1220):
+        filename = f"pubmed24n{i:04d}.xml.gz"
+        filepath = os.path.join(save_path, filename)
+        if not os.path.exists(filepath):
+            missing_files.append(filename)
+    return missing_files
+
+# Usage:
+missing_files = check_compressed_files(save_path)
+
+if missing_files:
+    print("The following compressed files are missing:")
+    for file in missing_files:
+        print(file)
+else:
+    print("All 1219 compressed files are present in the folder.")
+# Redownload whats missing
+
+import os
+import requests
+import gzip
+
+base_url = "https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/"
+save_path = "/content/drive/MyDrive/Colab Notebooks/Missing PubMed"
+
+files_to_download = [
+    "pubmed24n0311.xml.gz",
+    "pubmed24n0751.xml.gz",
+    "pubmed24n0904.xml.gz",
+    "pubmed24n0930.xml.gz",
+    "pubmed24n1076.xml.gz"
+]
+
+def download_and_decompress(filename, save_path):
+    file_url = base_url + filename
+    response = requests.get(file_url, stream=True)
+    response.raise_for_status()
+
+    with open(os.path.join(save_path, filename), 'wb') as compressed_file:
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:
+                compressed_file.write(chunk)
+
+    decompressed_filename = filename[:-3]
+    try:
+        with gzip.open(os.path.join(save_path, filename), 'rb') as compressed_file:
+            with open(os.path.join(save_path, decompressed_filename), 'wb') as decompressed_file:
+                decompressed_file.write(compressed_file.read())
+        print(f"{decompressed_filename} decompressed successfully.")
+    except (IOError, gzip.BadGzipFile) as e:
+        print(f"Error decompressing {filename}: {e}")
+
+# Create the directory
+os.makedirs(save_path, exist_ok=True)
+
+# Download and decompress files
+for filename in files_to_download:
+    download_and_decompress(filename, save_path)
+#merge files gradually
+
+import os
+import xml.etree.ElementTree as ET
+
+# Paths
+input_path = "/content/drive/MyDrive/Colab Notebooks/Whole PubMed"
+output_path = "/content/drive/MyDrive/Colab Notebooks/self merged"
+
+def merge_batch(start_file, end_file, output_path):
+    root = ET.Element('PubmedArticles')  # Create an empty root
+
+    for i in range(start_file, end_file + 1):
+        filename = f"pubmed24n{i:04d}.xml"
+        filepath = os.path.join(input_path, filename)
+        tree = ET.parse(filepath)
+        root.extend(tree.findall('PubmedArticle'))
+
+    # Save the merged XML
+    output_filename = f"merged_{start_file}-{end_file}.xml"
+    output_filepath = os.path.join(output_path, output_filename)
+    combined_tree = ET.ElementTree(root)
+    combined_tree.write(output_filepath, encoding='utf-8', xml_declaration=True)
+
+# Create the output directory
+os.makedirs(output_path, exist_ok=True)
+
+# Merge files in batches of 100
+batch_size = 100
+start_file = 1
+end_file = 1219
+
+for batch_start in range(start_file, end_file + 1, batch_size):
+    batch_end = min(batch_start + batch_size - 1, end_file)
+    merge_batch(batch_start, batch_end, output_path)
+
+    print(f"Batch {batch_start} to {batch_end} merged successfully!")
