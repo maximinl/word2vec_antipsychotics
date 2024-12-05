@@ -1,0 +1,215 @@
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from tqdm import tqdm
+import gensim
+import itertools
+import numpy as np
+import json
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+
+# load in raw abstracts JSON (with PubMed ID and title)
+with open('/content/drive/MyDrive/Colab Notebooks/self merged/Abstracts/abstracts1129-1219-2000-2023.json','rb') as f:
+  abstracts = json.load(f)
+
+# How does the corpus look?
+
+# 1. Date of the oldest entry
+oldest_year = min(
+    int(abstract.get("year", float("inf"))) for abstract in abstracts
+    if abstract is not None and isinstance(abstract, dict)
+)
+print("Date of the oldest entry:", oldest_year)
+
+# 2. Total number of abstracts
+total_abstracts = len(abstracts)
+print("Total number of abstracts:", total_abstracts)
+
+# Clean abstracts
+
+
+nltk.download('stopwords')
+nltk.download('punkt')
+
+def clean_text(line):
+    line = re.sub(r'-+', ' ', line)
+    line = re.sub(r'[^a-zA-Z, ]+', " ", line)
+    line = re.sub(r'[ ]+', " ", line)
+    line = re.sub(r'\b[A-Z]{5,}\b', '', line)  # Remove capitalized words with more than 4 characters
+    line = re.sub(r'\b\d+\b', '', line)  # Remove all numbers
+    translation_table = str.maketrans('','', '.,;?!|')
+    line = line.translate(translation_table)
+    line = line.lower()
+
+
+    stop_words = set(stopwords.words('english'))
+    word_tokens = word_tokenize(line)
+    filtered_sentence = [w for w in word_tokens if not w in stop_words and w.lower() != 'copyright']
+    filtered_sentence = [w for w in filtered_sentence if len(w) > 1]  # Exclude single-letter words
+    line = ' '.join(filtered_sentence)
+
+    return line
+
+firstabstracts = []
+for i, x in enumerate(abstracts):
+    if 'abstract' in x and x['abstract'] is not None:  # Check if 'abstract' exists and is not empty
+        firstabstracts.append(clean_text(x['abstract']))
+    else:
+        firstabstracts.append("")  # Add an empty string for missing entries
+
+corpus = []
+for i, x in enumerate(abstracts):
+    if 'abstract' in x and x['abstract'] is not None:  # Check for presence and not None
+        cleaned_abstract = clean_text(x['abstract'])
+        tokenized_abstract = word_tokenize(cleaned_abstract)
+        corpus.append(tokenized_abstract)
+    else:
+        corpus.append([])  # Add empty list for missing entries
+
+# After processing the abstracts with tokenisation, cleaning, etc.
+unique_words = set()
+for abstract in corpus:  # Assuming 'corpus' is the result of your processing
+    unique_words.update(abstract)  # Directly update with tokens
+
+num_unique_words = len(unique_words)
+print("Number of unique words in the corpus:", num_unique_words)
+
+# Inspect corpus
+
+corpus
+
+
+# Function to calculate analogy score using cosine distances 
+def analogy_score(a, b, c, d):
+    try:
+        return model.wv.cosine_similarities(model.wv[a] - model.wv[b] + model.wv[d], [model.wv[c]])[0]
+    except KeyError:
+        return 0.0
+
+# Example analogy task - 30 psychiatry analogies, 30 grammatical -
+# This is psychiatry specific, if other specialities are investigated, use different analogies
+
+analogies = [
+    ('amitriptyline', 'depression', 'risperidone', 'schizophrenia'),
+    ('nortriptyline', 'depression', 'lumateperone', 'schizophrenia'),
+    ('citalopram', 'depression', 'risperidone', 'schizophrenia'),
+    ('amitriptyline', 'depression', 'ziprasidone', 'schizophrenia'),
+    ('bupropion', 'depression', 'aripiprazole', 'schizophrenia'),
+    ('citalopram', 'depression', 'olanzapine', 'schizophrenia'),
+    ('nortriptyline', 'depression', 'asenapine', 'schizophrenia'),
+    ('clomipramine', 'depression', 'aripiprazole', 'schizophrenia'),
+    ('trazodone', 'depression', 'ziprasidone', 'schizophrenia'),
+    ('escitalopram','depression','ziprasidone','schizophrenia'),
+    ('nortriptyline','depression','quetiapine','schizophrenia'),
+    ('sertraline','depression','clozapine','schizophrenia'),
+    ('amitriptyline','depression','cariprazine','schizophrenia'),
+    ('citalopram','depression','ziprasidone','schizophrenia'),
+    ('clomipramine','depression','quetiapine','schizophrenia'),
+    ('vortioxetine','depression','risperidone','schizophrenia'),
+    ('fluoxetine','depression','ziprasidone','schizophrenia'),
+    ('psychosis', 'hallucination', 'ocd', 'compulsions'),
+    ('antipsychotic', 'dopamine', 'antidepressant', 'serotonin'),
+    ('clozapine', 'schizophrenia', 'fluoxetine', 'depression'),
+    ('asenapine', 'schizophrenia', 'citalopram', 'depression'),
+    ('risperidone', 'schizophrenia', 'sertraline', 'depression'),
+    ('antipsychotic', 'haloperidol', 'antidepressant', 'fluoxetine'),
+    ('antipsychotic', 'clozapine', 'antidepressant', 'sertraline'),
+    ('depression', 'antidepressant', 'schizophrenia', 'antipsychotic'),
+    ('anxiety', 'sertraline', 'bipolar', 'valproate'),
+
+
+
+
+    ('man', 'male', 'woman', 'female'),
+    ('father', 'man', 'mother', 'woman'),
+    ('brother', 'man', 'sister', 'woman'),
+    ('uncle', 'man', 'aunt', 'woman'),
+    ('actor', 'man', 'actress', 'woman'),
+    ('grandfather', 'man', 'grandmother', 'woman'),
+    ('son', 'man', 'daughter', 'woman'),
+    ('husband', 'man', 'wife', 'woman'),
+    ('fast', 'faster', 'slow', 'slower'),
+    ('good', 'better', 'bad', 'worse'),
+    ('happy', 'happier', 'sad', 'sadder'),
+    ('strong', 'stronger','weak','weaker'),
+    ('walk','walked','run','ran'),
+    ('speak','spoke','write','wrote'),
+    ('read','reading','listen','listening'),
+    ('eat','eating','drink','drinking'),
+    ('jump','jumped','swim','swam'),
+    ('car','road','boat','water'),
+    ('book','read','movie','watch'),
+    ('pen','write','keyboard','type'),
+    ('apple','fruit','chair','furniture'),
+    ('red','color','circle','shape'),
+    ('summer','hot','winter','cold'),
+    ('happy','joy','sad','sorrow'),
+    ('laugh','happiness','cry','sadness'),
+    ('walk','legs','throw','arms'),
+    ('bird','fly','fish','swim')
+]
+
+for analogy in analogies:
+    score = analogy_score(*analogy)
+    print(f"Analogy: {analogy} -> Score: {score}")
+
+# Hyperparameter Optimization
+best_score = 0
+best_params = None
+
+total_combinations = len([3, 5, 7]) * len([2, 5, 10]) * len([5, 15, 25]) * len([0, 1])
+model_combinations = tqdm(itertools.product([3, 5, 7], [2, 5, 10], [5, 15, 25], [0, 1]))
+
+for window_size, min_count, negative_samples, sg in model_combinations:
+    tmp_model = gensim.models.Word2Vec(corpus,
+                                       vector_size=300,
+                                       window=window_size,
+                                       min_count=min_count,
+                                       workers=31,
+                                       negative=negative_samples,
+                                       sample=6e-5,
+                                       alpha=0.025,
+                                       min_alpha=0.0007,
+                                       sg=sg)
+
+    tmp_score = analogy_score(*analogy)
+
+    if tmp_score > best_score:
+        best_score = tmp_score
+        best_params = {
+            'window_size': window_size,
+            'min_count': min_count,
+            'negative_samples': negative_samples,
+            'sg': sg
+        }
+
+print(f"Best parameters: {best_params}")
+
+
+
+# optimised model
+
+
+model = gensim.models.Word2Vec(corpus,
+                               vector_size=300,    # Dimensionality of word vectors
+                               window=3,           # Context window size
+                               min_count=2,        # Minimum word frequency
+                               workers=31,         # Number of parallel threads
+                               negative=5,         # Negative sampling
+                               sample=6e-5,        # Downsampling of frequent words
+                               alpha=0.025,        # Initial learning rate
+                               min_alpha=0.0007,   # Minimum learning rate
+                               sg=0)               # CBOW model (0) or skip-gram (1)
+# save model after training
+save_path = "/content/drive/MyDrive/word2vec/2023_word2vec.model"  # Path within your Drive
+model.save(save_path)
+
+import gensim
+# In a new session or later in your script
+model = gensim.models.Word2Vec.load("/content/drive/MyDrive/word2vec/2023_word2vec.model")
+
+
