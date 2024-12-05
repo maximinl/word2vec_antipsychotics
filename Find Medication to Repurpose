@@ -1,0 +1,12 @@
+word = 'clozapine'  # Enter taret medication here 
+if word in model.wv:  # Ensure word is in vocabulary
+    similar_words = model.wv.most_similar(word, topn=500 )
+
+    # Sort results by descending similarity
+    similar_words.sort(key=lambda x: x[1], reverse=True)
+
+    print(f"Words similar to '{word}' (in descending order of similarity):")
+    for position, (word, similarity) in enumerate(similar_words, start=1):  # Add position
+        print(f"  {position}. {word} (similarity: {similarity:.3f})")
+else:
+    print(f"Word '{word}' not found in the vocabulary")
