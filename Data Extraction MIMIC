@@ -1,0 +1,113 @@
+WITH initial_admissions AS (
+  SELECT
+    pa.subject_id,
+    a.hadm_id AS initial_hadm_id,
+    a.admittime AS initial_admittime,
+    a.dischtime AS initial_dischtime,
+    a.race,
+    pa.anchor_age,
+    pa.anchor_year_group,
+    pa.gender,
+    ROW_NUMBER() OVER (PARTITION BY pa.subject_id ORDER BY a.admittime) AS rn
+  FROM
+    `physionet-data.mimiciv_hosp.patients` AS pa
+  INNER JOIN
+    `physionet-data.mimiciv_hosp.admissions` AS a ON pa.subject_id = a.subject_id
+  WHERE
+    NOT EXISTS (
+      SELECT 1
+      FROM `physionet-data.mimiciv_hosp.diagnoses_icd` AS d
+      WHERE d.hadm_id = a.hadm_id
+      AND (
+        (d.icd_version = 9 AND d.icd_code BETWEEN '2900' AND '29616') OR
+        (d.icd_version = 9 AND d.icd_code BETWEEN '29640' AND '29689') OR
+        (d.icd_version = 10 AND d.icd_code BETWEEN 'F01' AND 'F3199') OR
+      )
+    )
+),
+patient_groups AS (
+  SELECT
+    ia.subject_id,
+    ia.initial_hadm_id,
+    ia.initial_admittime,
+    ia.initial_dischtime,
+    ia.race,
+    ia.anchor_age,
+    ia.anchor_year_group,
+    ia.gender,
+    CASE
+      WHEN MAX(CASE WHEN LOWER(pr.drug) IN (
+        'cefadroxil', 'cefazolin', 'cephradine', 'cephalexin', 'cephalothin', 'cephapirin',
+        'cefaclor', 'cefamandole', 'cefmetazole', 'cefonicid', 'cefotetan', 'cefoxitin',
+        'cefprozil', 'cefuroxime', 'loracarbef', 'cefdinir', 'cefditoren', 'cefixime',
+        'cefoperazone', 'cefotaxime', 'cefpodoxime', 'ceftazidime', 'ceftibuten',
+        'ceftriaxone', 'cefepime', 'ceftaroline'
+      ) THEN 1 ELSE 0 END) = 1 THEN 'Treated'
+      ELSE 'Control'
+    END AS group_type,
+    MAX(CASE WHEN LOWER(pr.drug) IN (
+      'cefadroxil', 'cefazolin', 'cephradine', 'cephalexin', 'cephalothin', 'cephapirin',
+      'cefaclor', 'cefamandole', 'cefmetazole', 'cefonicid', 'cefotetan', 'cefoxitin',
+      'cefprozil', 'cefuroxime', 'loracarbef', 'cefdinir', 'cefditoren', 'cefixime',
+      'cefoperazone', 'cefotaxime', 'cefpodoxime', 'ceftazidime', 'ceftibuten',
+      'ceftriaxone', 'cefepime', 'ceftaroline'
+    ) THEN pr.drug ELSE NULL END) AS drug,
+    STRING_AGG(DISTINCT d.icd_code, ', ') AS initial_admission_icd_code
+  FROM
+    initial_admissions AS ia
+  LEFT JOIN
+    `physionet-data.mimiciv_hosp.prescriptions` AS pr ON ia.initial_hadm_id = pr.hadm_id
+  LEFT JOIN
+    `physionet-data.mimiciv_hosp.diagnoses_icd` AS d ON ia.initial_hadm_id = d.hadm_id
+  WHERE
+    ia.rn = 1
+  GROUP BY
+    ia.subject_id, ia.initial_hadm_id, ia.initial_admittime, ia.initial_dischtime,
+    ia.race, ia.anchor_age, ia.anchor_year_group, ia.gender
+),
+subsequent_admissions AS (
+  SELECT
+    pg.subject_id,
+    sa.hadm_id AS subsequent_hadm_id,
+    sa.admittime AS subsequent_admittime,
+    sd.icd_code AS subsequent_icd_code,
+    sd.icd_version AS subsequent_icd_version,
+    ROW_NUMBER() OVER (PARTITION BY pg.subject_id ORDER BY sa.admittime) AS rn
+  FROM
+    patient_groups AS pg
+  LEFT JOIN
+    `physionet-data.mimiciv_hosp.admissions` AS sa ON pg.subject_id = sa.subject_id
+  LEFT JOIN
+    `physionet-data.mimiciv_hosp.diagnoses_icd` AS sd ON sa.hadm_id = sd.hadm_id
+  WHERE
+    sa.admittime > pg.initial_dischtime
+    AND (
+      (sd.icd_version = 9 AND sd.icd_code BETWEEN '2900' AND '29616')
+      OR (sd.icd_version = 9 AND sd.icd_code BETWEEN '29640' AND '29689')
+      OR (sd.icd_version = 10 AND sd.icd_code BETWEEN 'F01' AND 'F3199')
+    )
+)
+SELECT
+  pg.subject_id,
+  pg.initial_hadm_id,
+  pg.initial_admittime,
+  pg.race,
+  pg.anchor_age,
+  pg.anchor_year_group,
+  pg.gender,
+  sa.subsequent_hadm_id,
+  sa.subsequent_admittime,
+  sa.subsequent_icd_code,
+  sa.subsequent_icd_version,
+  COALESCE(DATE_DIFF(sa.subsequent_admittime, pg.initial_admittime, DAY), 5000) AS days_between,
+  pg.group_type,
+  pg.drug,
+  pg.initial_admission_icd_code
+FROM
+  patient_groups AS pg
+LEFT JOIN
+  (SELECT * FROM subsequent_admissions WHERE rn = 1) AS sa ON pg.subject_id = sa.subject_id
+WHERE
+  COALESCE(DATE_DIFF(sa.subsequent_admittime, pg.initial_admittime, DAY), 5000) != 0
+ORDER BY
+  pg.subject_id;
