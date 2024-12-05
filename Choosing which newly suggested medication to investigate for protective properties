@@ -1,0 +1,16 @@
+SELECT p.drug, COUNT(DISTINCT p.subject_id) AS patient_count
+FROM `physionet-data.mimiciv_hosp.diagnoses_icd` d
+JOIN `physionet-data.mimiciv_hosp.prescriptions` p 
+  ON d.subject_id = p.subject_id
+WHERE 
+  -- Diagnosis Criteria
+  (
+   (d.icd_version = 9 AND d.icd_code BETWEEN '2900' AND '29616') OR
+        (d.icd_version = 9 AND d.icd_code BETWEEN '29640' AND '29689') OR
+   (d.icd_version = 10 AND d.icd_code BETWEEN 'F01' AND 'F3199')) 
+  AND
+  -- Drug Criteria
+  LOWER(p.drug) IN (
+     'cenobamate', 'cefepime', 'mepoluzimab', 'ticagrelor', 'ibrutnib', -- top 5 drugs close to clozapine
+     )
+GROUP BY p.drug;
