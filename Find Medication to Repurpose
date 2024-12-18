@@ -1,12 +1,50 @@
-word = 'clozapine'  # Enter taret medication here 
-if word in model.wv:  # Ensure word is in vocabulary
-    similar_words = model.wv.most_similar(word, topn=500 )
-
-    # Sort results by descending similarity
+def analyze_word_relationships(model, input_word, abstracts, top_n=10):
+    """
+    Finds similar words using word2vec and checks which haven't co-occurred with psychiatric terms.
+    """
+    target_terms = ['psychosis', 'psychotic', 'antipsychotic', 'antipsychotics', 'schizophrenic','schizophrenia', 'clozapine']
+    
+    if input_word not in model.wv:
+        print(f"Word '{input_word}' not found in the vocabulary")
+        return
+    
+    # Get similar words from word2vec
+    similar_words = model.wv.most_similar(input_word, topn=500)
     similar_words.sort(key=lambda x: x[1], reverse=True)
+    
+    # Find novel associations
+    abstract_texts = [str(abstract).lower() for abstract in abstracts]
+    novel_associations = []
+    processed_count = 0
+    
+    for word, similarity in similar_words:
+        # Skip if the word is one of our target terms
+        if word.lower() in [term.lower() for term in target_terms]:
+            continue
+            
+        # Check if word has co-occurred with ANY of the target terms
+        has_cooccurred = False
+        
+        for abstract in abstract_texts:
+            if word.lower() in abstract:
+                if any(term.lower() in abstract for term in target_terms):
+                    has_cooccurred = True
+                    break
+        
+        if not has_cooccurred:
+            novel_associations.append((word, similarity))
+            processed_count += 1
+            
+        if len(novel_associations) >= top_n:
+            break
+    
+    # Print results
+    print(f"\nTop {top_n} words similar to '{input_word}' that haven't co-occurred with psychiatric terms:")
+    for i, (word, similarity) in enumerate(novel_associations, 1):
+        print(f"  {i}. {word} (similarity: {similarity:.3f})")
+    
+    print(f"\nProcessed {processed_count} words to find {len(novel_associations)} novel associations")
 
-    print(f"Words similar to '{word}' (in descending order of similarity):")
-    for position, (word, similarity) in enumerate(similar_words, start=1):  # Add position
-        print(f"  {position}. {word} (similarity: {similarity:.3f})")
-else:
-    print(f"Word '{word}' not found in the vocabulary")
+# Example usage:
+word = 'clozapine'
+analyze_word_relationships(model, word, abstracts)
