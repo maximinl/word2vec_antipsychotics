@@ -11,6 +11,7 @@ WHERE
   AND
   -- Drug Criteria
   LOWER(p.drug) IN (
-     'cenobamate', 'cefepime', 'mepoluzimab', 'ticagrelor', 'ibrutnib', -- top 5 drugs close to clozapine
+     'tiapride', 'clobazam', 'cenobamate', 'cabergoline', 'lacosamide', -- top 10 drugs close to clozapine
+     'cefepime', 'mepolizumab', 'eltrombopag', 'zonisamide', 'omalizumab'
      )
 GROUP BY p.drug;
