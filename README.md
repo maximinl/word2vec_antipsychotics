@@ -18,10 +18,8 @@ We used a modified Word2vec implementation in gensim (https://radimrehurek.com/g
 
 1.3) Medication Screening
 We screened clozapine as it is the only compound reserved for patients with treatment-resistant schizophrenia due to its potentially hazardous side effects profile.  
-
-A new prediction was every word that was close to the input word, was a medication and had not been mentioned together with the following term in a PubMed abstract: (schizo* OR psychot* OR psychosis OR antipsychotics OR Clozapine) between 2000-2023. In cases where there were five or less abstracts were a word and the above query were mentioned together, we checked if the abstracts in question were featured in our training corpus. This was always a real possibility, since, as described earlier, only a fraction of all PubMed abstracts were included as source data. If the abstracts were not featured in the training corpus, the word was considered a prediction, since the model did not know about a connection of the two words through abstracts. 
-
-When recreating this, any medication can be screened. For example, you could be searching for 'Levodopa' and see if there are words close to it that arent ususally associated with it. 
+A new prediction was every word that was close to the input word, was a medication and had not been mentioned together with the following term in a PubMed abstract in our corpus: ‘schizophrenia’, ‘schizophrenic’, ‘psychotic’, ‘psychosis’, ‘antipsychotic’, ‘antipsychotics’ or ‘clozapine’, between 2000-2023. These words were considered a prediction, since the model could not have known about a connection of the two words through abstracts in our corpus. 
+When recreating this, any medication can be screened. For example, you could be searching for 'levodopa' and see if there are words close to it that arent ususally associated with it. 
 
 2) Hypothesis Testing
 2.1) Methodology
